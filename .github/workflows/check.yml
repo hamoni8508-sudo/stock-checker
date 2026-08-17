@@ -2,8 +2,8 @@ name: Stock Checker
 
 on:
   schedule:
-    # 15분마다 GitHub 실행 요청
-    - cron: '*/15 * * * *'
+    # 20분마다 GitHub 실행 요청
+    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 # 중복 실행 방지 설정 (이전 작업이 진행 중이면 자동으로 정리 후 교체)
