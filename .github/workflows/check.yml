@@ -6,14 +6,15 @@ on:
     - cron: '*/20 * * * *'
   workflow_dispatch:
 
-# 중복 실행 방지 설정 (이전 작업이 진행 중이면 자동으로 정리 후 교체)
+# 기존 실행 중인 작업이 중간에 강제 취소되는 현상 방지
 concurrency:
   group: stock-checker-group
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   check-stock:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: 코드 불러오기
         uses: actions/checkout@v4
