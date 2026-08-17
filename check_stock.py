@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 # 소니 스토어 해당 상품 URL
 TARGET_URL = "https://store.sony.co.kr/product-view/135951891"
 
-# 텔레그램 보안 정보
+# 텔레그램 보안 정보 (GitHub Secrets)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -20,7 +20,7 @@ def send_telegram(message):
 
 def check():
     with sync_playwright() as p:
-        print("가상 브라우저를 실행합니다...")
+        print("가상 브라우저를 실행하여 소니 스토어 재고 상태를 확인합니다...")
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -28,7 +28,7 @@ def check():
         )
         page = context.new_page()
         
-        # 페이지 이동 후 자바스크립트 로딩 완료를 위해 5초 대기
+        # 페이지 이동 후 동적 자바스크립트 렌더링 완료를 위해 5초 대기
         page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=60000)
         time.sleep(5)
         
@@ -36,15 +36,20 @@ def check():
         content = page.content()
         browser.close()
         
-        # '일시품절' 문구가 정상적으로 인식되었는지 검증
-        if "일시품절" in content or "일시 품절" in content or "재입고 알림" in content:
-            msg = f"✅ [텍스트 인식 성공!]\n\n소니 스토어 페이지에서 '일시품절' 문구를 완벽하게 읽어냈습니다!\n\n자바스크립트 렌더링 및 페이지 탐색이 정상 작동 중입니다."
+        # 1. 품절 키워드 감지 ('일시품절', '일시 품절', '재입고 알림')
+        outofstock_keywords = ["일시품절", "일시 품절", "재입고 알림"]
+        if any(kw in content for kw in outofstock_keywords):
+            print("현재 여전히 '일시품절' 상태입니다. (정상 모니터링 중)")
+            return
+
+        # 2. 구매 가능 키워드 감지 ('바로 구매', '바로구매', '구매하기')
+        available_keywords = ["바로 구매", "바로구매", "구매하기"]
+        if any(kw in content for kw in available_keywords):
+            msg = f"🎉 [소니 스토어 재입고 알림!]\n\n지금 상품 구매가 가능합니다!\n\n구매하러 가기:\n{TARGET_URL}"
             send_telegram(msg)
-            print("일시품절 문구 인식 성공! 텔레그램 메시지를 전송했습니다.")
+            print("재입고 감지! 텔레그램 메시지를 성공적으로 발송했습니다.")
         else:
-            msg = f"⚠️ [텍스트 인식 실패]\n\n페이지에서 '일시품절' 문구를 읽어내지 못했습니다."
-            send_telegram(msg)
-            print("일시품절 문구를 찾지 못했습니다.")
+            print("재고 상태를 완벽히 구분할 수 없어 오탐 방지를 위해 알림을 발송하지 않았습니다.")
 
 if __name__ == "__main__":
     check()
