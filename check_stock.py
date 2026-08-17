@@ -3,10 +3,8 @@ import time
 import requests
 from playwright.sync_api import sync_playwright
 
-# 소니 스토어 해당 상품 URL
 TARGET_URL = "https://store.sony.co.kr/product-view/135951891"
 
-# 텔레그램 보안 정보
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -19,7 +17,6 @@ def send_telegram(message):
         print(f"텔레그램 발송 실패: {e}")
 
 def check_once():
-    """1회 재고 단단히 확인 함수"""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
@@ -28,7 +25,6 @@ def check_once():
         )
         page = context.new_page()
         
-        # 페이지 로딩 후 5초 대기
         page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=60000)
         time.sleep(5)
         
@@ -53,14 +49,14 @@ def check_once():
             return False
 
 def main():
-    # 한번 실행 시 5분(300초) 간격으로 총 5번(약 20~25분) 연속 체크
-    CHECK_COUNT = 5
-    INTERVAL_SECONDS = 300
+    # 1분(60초) 간격으로 총 15번(약 15분간) 연속 검사
+    CHECK_COUNT = 15
+    INTERVAL_SECONDS = 60
 
-    print(f"🔄 [연속 감시 시작] 총 {CHECK_COUNT}회, {INTERVAL_SECONDS//60}분 간격으로 엄격하게 검사합니다.\n")
+    print(f"🔄 [초밀착 감시 시작] 총 {CHECK_COUNT}회, {INTERVAL_SECONDS}초(1분) 간격으로 검사합니다.\n")
     
     for i in range(1, CHECK_COUNT + 1):
-        print(f"[{i}/{CHECK_COUNT} 회차 검사] {time.strftime('%H:%M:%S')}")
+        print(f"[{i}/{CHECK_COUNT} 회차] {time.strftime('%H:%M:%S')}")
         is_found = check_once()
         
         if is_found:
@@ -68,7 +64,7 @@ def main():
             break
             
         if i < CHECK_COUNT:
-            print(f"  -> 다음 5분 뒤 검사를 위해 대기 중...\n")
+            print(f"  -> 다음 1분 뒤 재검사를 위해 대기 중...\n")
             time.sleep(INTERVAL_SECONDS)
 
 if __name__ == "__main__":
