@@ -1,5 +1,6 @@
 import os
 import requests
+from playwright.sync_api import sync_playwright
 
 # 소니 스토어 해당 상품 URL
 TARGET_URL = "https://store.sony.co.kr/product-view/135951891"
@@ -12,32 +13,33 @@ def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     try:
-        requests.post(url, data=data)
+        requests.post(url, data=data, timeout=10)
     except Exception as e:
         print(f"텔레그램 발송 실패: {e}")
 
 def check():
-    # 차단 방지를 위한 브라우저 헤더 설정
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-    }
-    
-    try:
-        response = requests.get(TARGET_URL, headers=headers, timeout=10)
-        response.encoding = 'utf-8'
-        html_text = response.text
+    with sync_playwright() as p:
+        # 가상 크롬 브라우저 실행
+        print("가상 브라우저를 실행하여 소니 스토어에 접속합니다...")
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
         
-        # '일시품절' 문구가 사라졌거나 '바로 구매' 문구가 나타나면 알림
-        if "일시품절" not in html_text or "바로 구매" in html_text:
+        # 페이지 이동 및 자바스크립트 로딩 완료 대기
+        page.goto(TARGET_URL, wait_until="networkidle", timeout=60000)
+        
+        # 자바스크립트 실행이 끝난 실제 화면의 전체 텍스트 추출
+        content = page.content()
+        browser.close()
+        
+        # 화면 텍스트에 '일시품절'이 포함되어 있는지 확인
+        if "일시품절" in content:
+            print("현재 여전히 '일시품절' 상태입니다. (자바스크립트 렌더링 확인 완료)")
+        elif "바로 구매" in content or "장바구니" in content:
             msg = f"🎉 [소니 스토어 재입고 알림!]\n\n지금 상품 구매가 가능합니다!\n\n구매하러 가기:\n{TARGET_URL}"
             send_telegram(msg)
             print("재입고 감지! 텔레그램 메시지를 발송했습니다.")
         else:
-            print("현재 여전히 '일시품절' 상태입니다.")
-            
-    except Exception as e:
-        print(f"페이지 확인 중 오류 발생: {e}")
+            print("페이지를 읽었으나 상태를 판단할 수 없습니다. 로그 확인 필요.")
 
 if __name__ == "__main__":
     check()
