@@ -2,7 +2,7 @@ name: Stock Checker
 
 on:
   schedule:
-    # 20분마다 GitHub이 스크립트를 실행 (스크립트 내부에서 5분 간격으로 5회 연속 감시)
+    # 20분마다 GitHub이 스크립트 실행 (check_stock.py 내부에서 5분 간격으로 5회 연속 감시)
     - cron: '*/20 * * * *'
   workflow_dispatch:
 
@@ -27,4 +27,5 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PYTHONUNBUFFERED: "1"  # 파이썬 print 출력을 실시간으로 한 줄씩 표시하도록 설정
         run: python check_stock.py
