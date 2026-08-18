@@ -6,9 +6,11 @@ from playwright.sync_api import sync_playwright
 # 소니 스토어 해당 상품 URL
 TARGET_URL = "https://store.sony.co.kr/product-view/135951891"
 
-# 텔레그램 보안 정보 (GitHub Secrets)
+# 환경 변수 (GitHub Secrets 및 기본 제공 변수)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 
 def send_telegram(message):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
@@ -21,10 +23,30 @@ def send_telegram(message):
     except Exception as e:
         print(f"텔레그램 발송 실패: {e}", flush=True)
 
+def trigger_next_run():
+    """종료 직전 깃허브 API를 직접 호출하여 공백 없이 다음 워크플로우를 즉시 실행시킵니다."""
+    if not GITHUB_TOKEN or not GITHUB_REPOSITORY:
+        print("  -> ⚠️ GITHUB_TOKEN 또는 GITHUB_REPOSITORY 설정이 없어 자동 바통 터치를 스킵합니다.", flush=True)
+        return
+
+    url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/actions/workflows/check.yml/dispatches"
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    data = {"ref": "main"}
+    try:
+        res = requests.post(url, headers=headers, json=data, timeout=10)
+        if res.status_code == 204:
+            print("  -> 🚀 [셀프 바통 터치] 다음 2시간 감시 작업을 공백 없이 즉시 호출했습니다!", flush=True)
+        else:
+            print(f"  -> ⚠️ 바통 터치 호출 응답 코드: {res.status_code}", flush=True)
+    except Exception as e:
+        print(f"  -> ⚠️ 바통 터치 API 호출 중 오류 발생: {e}", flush=True)
+
 def check_once():
-    """매 회차마다 브라우저를 새롭게 실행하여 멈춤 및 메모리 누수를 완전히 방지합니다."""
+    """1회 재고 검사 수행"""
     with sync_playwright() as p:
-        # GitHub Actions 리눅스 가상머신 메모리 데드락 방지 옵션
         browser = p.chromium.launch(
             headless=True,
             args=[
@@ -41,9 +63,8 @@ def check_once():
         page = context.new_page()
         
         try:
-            # 페이지 접속 (최대 30초 대기)
             page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=30000)
-            time.sleep(3)  # JS 렌더링 안정화 대기
+            time.sleep(3)
             content = page.content()
         finally:
             page.close()
@@ -68,13 +89,18 @@ def check_once():
         return False
 
 def main():
-    CHECK_COUNT = 20
+    CHECK_COUNT = 120  # 1분 간격 120회 (2시간)
     INTERVAL_SECONDS = 60
 
     print(f"🔄 [초밀착 감시 시작] 총 {CHECK_COUNT}회, {INTERVAL_SECONDS}초(1분) 간격으로 검사합니다.\n", flush=True)
 
     for i in range(1, CHECK_COUNT + 1):
         print(f"[{i}/{CHECK_COUNT} 회차] {time.strftime('%H:%M:%S')}", flush=True)
+        
+        # 119회차(종료 1분 전)에 다음 2시간 작업을 미리 구동시킴 (공백 제거)
+        if i == CHECK_COUNT - 1:
+            trigger_next_run()
+
         try:
             is_found = check_once()
             if is_found:
