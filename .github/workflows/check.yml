@@ -2,11 +2,15 @@ name: Stock Checker
 
 on:
   schedule:
-    # 20분마다 GitHub 실행 요청
-    - cron: '*/20 * * * *'
+    # 안전장치용 2시간 크론 스케줄 (API 바통 터치가 실패할 경우를 대비한 백업)
+    - cron: '0 */2 * * *'
   workflow_dispatch:
 
-# 기존 실행 중인 작업이 중간에 강제 취소되는 현상 방지
+# API로 스스로를 호출할 수 있도록 권한 부여
+permissions:
+  contents: read
+  actions: write
+
 concurrency:
   group: stock-checker-group
   cancel-in-progress: false
@@ -14,15 +18,24 @@ concurrency:
 jobs:
   check-stock:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 150
     steps:
       - name: 코드 불러오기
         uses: actions/checkout@v4
 
-      - name: 파이썬 설치
+      - name: 파이썬 설치 및 패키지 캐싱
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip'
+
+      - name: Playwright 브라우저 캐시 설정 (설치 시간 15초로 단축)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/check_stock.py') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: 패키지 및 가상 브라우저(Playwright) 설치
         run: |
@@ -33,5 +46,6 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYTHONUNBUFFERED: "1"
         run: python check_stock.py
