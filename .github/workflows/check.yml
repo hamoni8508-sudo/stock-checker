@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Playwright 브라우저 캐시 설정 (설치 시간 15초로 단축)
+      - name: Playwright 브라우저 캐시 설정
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -39,7 +39,7 @@ jobs:
       - name: 패키지 및 가상 브라우저(Playwright) 설치
         run: |
           pip install requests playwright
-          playwright install chromium --with-deps
+          playwright install chromium
 
       - name: 재고 감지 스크립트 실행
         env:
